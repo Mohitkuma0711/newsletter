@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Device Tracker</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #1a1a1a; padding: 40px; border-radius: 16px; text-align: center; max-width: 400px; width: 90%; }
+    .icon { font-size: 48px; margin-bottom: 20px; }
+    h1 { font-size: 1.5rem; margin-bottom: 10px; }
+    p { color: #888; margin-bottom: 20px; }
+    .status { padding: 12px; border-radius: 8px; font-size: 0.9rem; }
+    .loading { background: #1a2a1a; color: #4ade80; }
+    .success { background: #1a2a1a; color: #4ade80; }
+    .error { background: #2a1a1a; color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📍</div>
+    <h1>Device Tracker</h1>
+    <p>Reporting your device location...</p>
+    <div id="status" class="status loading">Detecting location...</div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+
+    function getDeviceName() {
+      const ua = navigator.userAgent;
+      if (/iPhone/.test(ua)) return "iPhone";
+      if (/iPad/.test(ua)) return "iPad";
+      if (/Android/.test(ua)) return "Android";
+      if (/Mac/.test(ua)) return "Mac";
+      if (/Windows/.test(ua)) return "Windows PC";
+      if (/Linux/.test(ua)) return "Linux PC";
+      return "Unknown Device";
+    }
+
+    function sendLocation(data) {
+      fetch("/api/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      }).then(res => res.json()).then(res => {
+        if (res.success) {
+          statusEl.className = "status success";
+          statusEl.innerText = "Location saved!";
+        } else {
+          statusEl.className = "status error";
+          statusEl.innerText = "Error: " + (res.error || "Failed");
+        }
+      }).catch(err => {
+        statusEl.className = "status error";
+        statusEl.innerText = "Error: " + err.message;
+      });
+    }
+
+    const deviceName = getDeviceName();
+    const deviceId = localStorage.getItem("device_id") || crypto.randomUUID();
+    localStorage.setItem("device_id", deviceId);
+
+    fetch("https://ipapi.co/json/")
+      .then(res => res.json())
+      .then(data => {
+        const locationData = {
+          deviceId,
+          deviceName,
+          ip: data.ip,
+          city: data.city,
+          region: data.region,
+          country: data.country_name,
+          org: data.org,
+          lat: null,
+          lon: null,
+          timestamp: new Date().toISOString()
+        };
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition((pos) => {
+            locationData.lat = pos.coords.latitude;
+            locationData.lon = pos.coords.longitude;
+            sendLocation(locationData);
+          }, () => sendLocation(locationData));
+        } else {
+          sendLocation(locationData);
+        }
+      }).catch(() => {
+        statusEl.className = "status error";
+        statusEl.innerText = "Failed to detect location";
+      });
+  </script>
+</body>
+</html>

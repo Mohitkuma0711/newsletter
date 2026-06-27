@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Devices</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+    .header { background: #1a1a1a; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+    .header h1 { font-size: 1.3rem; }
+    .btn { background: #3b82f6; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+    .btn:hover { background: #2563eb; }
+    .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat { background: #1a1a1a; padding: 20px; border-radius: 12px; text-align: center; }
+    .stat .num { font-size: 2rem; font-weight: bold; color: #3b82f6; }
+    .stat .label { color: #888; font-size: 0.85rem; margin-top: 5px; }
+    .device-list { display: flex; flex-direction: column; gap: 10px; }
+    .device { background: #1a1a1a; padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+    .device .info h3 { font-size: 1rem; margin-bottom: 5px; }
+    .device .info p { color: #888; font-size: 0.85rem; }
+    .device .location { text-align: right; }
+    .device .location p { color: #4ade80; font-size: 0.9rem; }
+    .device .location small { color: #666; }
+    .map-link { color: #3b82f6; text-decoration: none; font-size: 0.85rem; }
+    .map-link:hover { text-decoration: underline; }
+    .empty { text-align: center; padding: 60px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>My Devices</h1>
+    <button class="btn" onclick="loadDevices()">Refresh</button>
+  </div>
+  <div class="container">
+    <div class="stats">
+      <div class="stat">
+        <div class="num" id="totalDevices">0</div>
+        <div class="label">Total Devices</div>
+      </div>
+      <div class="stat">
+        <div class="num" id="onlineDevices">0</div>
+        <div class="label">Active Today</div>
+      </div>
+      <div class="stat">
+        <div class="num" id="lastUpdate">-</div>
+        <div class="label">Last Update</div>
+      </div>
+    </div>
+    <div id="deviceList" class="device-list"></div>
+  </div>
+
+  <script>
+    function timeAgo(ts) {
+      const diff = Date.now() - new Date(ts).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return "Just now";
+      if (mins < 60) return mins + "m ago";
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return hours + "h ago";
+      return Math.floor(hours / 24) + "d ago";
+    }
+
+    function loadDevices() {
+      fetch("/api/devices")
+        .then(res => res.json())
+        .then(devices => {
+          const list = document.getElementById("deviceList");
+          document.getElementById("totalDevices").textContent = devices.length;
+
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const online = devices.filter(d => new Date(d.timestamp) >= today);
+          document.getElementById("onlineDevices").textContent = online.length;
+
+          if (devices.length > 0) {
+            document.getElementById("lastUpdate").textContent = timeAgo(devices[0].timestamp);
+          }
+
+          if (devices.length === 0) {
+            list.innerHTML = '<div class="empty">No devices yet. Visit /track.html from your devices.</div>';
+            return;
+          }
+
+          list.innerHTML = devices.map(d => `
+            <div class="device">
+              <div class="info">
+                <h3>${d.deviceName}</h3>
+                <p>${d.ip} • ${d.org || "Unknown"}</p>
+              </div>
+              <div class="location">
+                <p>${d.city || "?"}, ${d.region || "?"}</p>
+                ${d.lat && d.lon ? `<a class="map-link" href="https://www.google.com/maps?q=${d.lat},${d.lon}" target="_blank">View on Map</a>` : ""}
+                <small>${timeAgo(d.timestamp)}</small>
+              </div>
+            </div>
+          `).join("");
+        });
+    }
+
+    loadDevices();
+    setInterval(loadDevices, 30000);
+  </script>
+</body>
+</html>
